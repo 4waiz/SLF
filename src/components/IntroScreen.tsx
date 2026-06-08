@@ -21,7 +21,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
 
       <main className="intro-stack">
         <img
-          src="/darksvg.png"
+          src="/animated%20logo.gif"
           alt="BRIDGE"
           className="brand-img brand-lg intro-rise"
           style={{ animationDelay: '0.05s' }}
