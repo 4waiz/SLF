@@ -30,7 +30,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
       <main className="login-card">
         <img
-          src="/darksvg.png"
+          src="/animated%20logo.gif"
           alt="BRIDGE"
           className="brand-img brand-lg intro-rise"
           style={{ animationDelay: '0.05s' }}
