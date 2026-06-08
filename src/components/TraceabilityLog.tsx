@@ -1,14 +1,14 @@
 import type { VerificationRecord } from '../types'
-import { steps } from '../data/steps'
+import { DRONE_COLORS } from '../data/steps'
 
 interface TraceabilityLogProps {
   records: VerificationRecord[]
   operator: string
 }
 
-// Map canopy colour names → hex so the log can render an accurate swatch.
+// Map body-colour names → hex so the log can render an accurate swatch.
 const COLOR_HEX: Record<string, string> = Object.fromEntries(
-  steps.flatMap((s) => s.colors ?? []).map((c) => [c.name, c.hex] as const),
+  DRONE_COLORS.map((c) => [c.name, c.hex] as const),
 )
 
 function formatTime(ts: number): string {
@@ -23,7 +23,7 @@ export function TraceabilityLog({ records, operator }: TraceabilityLogProps) {
   const ordered = [...records].reverse()
 
   return (
-    <section className="rail trace-log" aria-label="Traceability log">
+    <section className={`rail trace-log${ordered.length === 0 ? ' is-empty' : ''}`} aria-label="Traceability log">
       <header className="rail-head">
         <span className="rail-kicker">Genealogy</span>
         <h2 className="rail-title">Traceability Log</h2>
@@ -32,14 +32,7 @@ export function TraceabilityLog({ records, operator }: TraceabilityLogProps) {
         </p>
       </header>
 
-      {ordered.length === 0 ? (
-        <div className="log-empty">
-          <span className="log-empty-mark" aria-hidden="true">
-            ⌁
-          </span>
-          No verifications yet. Scan the first part to begin the build record.
-        </div>
-      ) : (
+      {ordered.length > 0 && (
         <ol className="log-list">
           {ordered.map((r) => (
             <li className="log-row" key={`${r.stepId}-${r.timestamp}`}>

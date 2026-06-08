@@ -1,34 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { VerificationRecord, VerificationSource } from '../types'
-import { steps, OPERATOR, STATION_ID, WORK_ORDER } from '../data/steps'
+import type { CSSProperties } from 'react'
+import type { DroneColorId, VerificationRecord, VerificationSource } from '../types'
+import { steps, OPERATOR, STATION_ID, WORK_ORDER, DRONE_COLORS } from '../data/steps'
 import { recordsService } from '../lib/records'
+import { playOk, playHelp, playProblem, playFinish, playError } from '../lib/sound'
 import { StepRail } from './StepRail'
-import { InstructionPanel } from './InstructionPanel'
+import { StageSection } from './StageSection'
 import { TraceabilityLog } from './TraceabilityLog'
 import { CompletionCard } from './CompletionCard'
+import { Lightbox } from './Lightbox'
 import { VerificationModal } from './VisionVerification'
 
 interface AssemblyStationProps {
+  /** Colour-way chosen in the build-start pop-up. */
+  initialColor: DroneColorId
   onExit: () => void
 }
 
-const DEFAULT_COLOR = steps.find((s) => s.colors)?.colors?.[0]?.name ?? ''
 const UNIT_SERIAL = `BRG-DRN-${WORK_ORDER.slice(-4)}-01`
 
+type Toast = { kind: 'error' | 'warn' | 'info'; text: string } | null
+type MediaTarget = { index: number; slide: number } | null
+
 /**
- * Assembly station: a plain-white, single-stage production form. The stage list
- * and traceability log live in the ☰ drawer (kept off-screen for an uncluttered
- * worker view); the camera verification is a pop-up opened from "Verify Part".
+ * Assembly station: a single-page production form. Every stage is laid out
+ * top-to-bottom as its own section (matching the reference MES); finishing one
+ * section advances the highlight to the next and scrolls it into view. The ☰
+ * drawer holds the stage list + traceability log; the green/amber/red Poka-yoke
+ * controls (OK · Help · Problem) live in the top bar; Finish sits in the footer.
  */
-export function AssemblyStation({ onExit }: AssemblyStationProps) {
-  const [completed, setCompleted] = useState<boolean[]>(() => steps.map(() => false))
-  const [activeIndex, setActiveIndex] = useState(0)
+export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) {
   const [records, setRecords] = useState<VerificationRecord[]>([])
-  const [selectedColorName, setSelectedColorName] = useState<string>(DEFAULT_COLOR)
+  const [colorId, setColorId] = useState<DroneColorId>(initialColor)
   const [hydrated, setHydrated] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [verifyOpen, setVerifyOpen] = useState(false)
+  const [verifyIndex, setVerifyIndex] = useState<number | null>(null)
+  const [media, setMedia] = useState<MediaTarget>(null)
+  const [toast, setToast] = useState<Toast>(null)
+  const [finishMenuOpen, setFinishMenuOpen] = useState(false)
+  const [showCompletion, setShowCompletion] = useState(false)
+
   const scrollRef = useRef<HTMLElement>(null)
+  const sectionRefs = useRef<(HTMLElement | null)[]>([])
+  const prevActive = useRef<number | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Restore any in-progress build from IndexedDB on mount (survives reload).
   useEffect(() => {
@@ -38,12 +53,10 @@ export function AssemblyStation({ onExit }: AssemblyStationProps) {
       .then((recs) => {
         if (!alive) return
         setRecords(recs)
-        const done = steps.map((s) => recs.some((r) => r.stepId === s.id))
-        setCompleted(done)
-        const restoredColor = recs.find((r) => r.color)?.color
-        if (restoredColor) setSelectedColorName(restoredColor)
-        const firstIncomplete = done.findIndex((d) => !d)
-        setActiveIndex(firstIncomplete === -1 ? steps.length - 1 : firstIncomplete)
+        // A restored in-progress build keeps its original colour-way.
+        const restoredName = recs.find((r) => r.color)?.color
+        const restored = DRONE_COLORS.find((c) => c.name === restoredName)
+        if (restored) setColorId(restored.id)
       })
       .catch(() => {
         // Unreadable store → start a fresh build.
@@ -56,60 +69,142 @@ export function AssemblyStation({ onExit }: AssemblyStationProps) {
     }
   }, [])
 
-  // Snap the form back to the top whenever the stage changes.
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 })
-  }, [activeIndex])
+  const color = DRONE_COLORS.find((c) => c.id === colorId) ?? DRONE_COLORS[0]
 
-  const activeStep = steps[activeIndex]
+  const completed = useMemo(
+    () => steps.map((s) => records.some((r) => r.stepId === s.id)),
+    [records],
+  )
   const doneCount = completed.filter(Boolean).length
   const allDone = hydrated && doneCount === steps.length
+  const firstIncomplete = completed.findIndex((c) => !c)
+  const activeIndex = firstIncomplete === -1 ? steps.length - 1 : firstIncomplete
   const progressPct = `${(doneCount / steps.length) * 100}%`
   const formId = `${WORK_ORDER}.ASSY-${String(activeIndex + 1).padStart(2, '0')}`
 
-  const activeRecord = useMemo(
-    () => records.find((r) => r.stepId === activeStep.id),
-    [records, activeStep.id],
-  )
+  // When the frontier moves (a section just completed, or a partial build is
+  // restored), bring the new section into view — "finish one, continue to the
+  // next on the same page". We only scroll on an actual change, never on first
+  // mount, so the form header stays put on a fresh load.
+  useEffect(() => {
+    if (prevActive.current === null) {
+      prevActive.current = activeIndex
+      return
+    }
+    if (activeIndex === prevActive.current) return
+    prevActive.current = activeIndex
+    if (!allDone) {
+      sectionRefs.current[activeIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [activeIndex, allDone])
 
-  const handlePass = (serial: string, source: VerificationSource) => {
-    const step = steps[activeIndex]
+  // Auto-dismiss toasts.
+  useEffect(() => {
+    if (!toast) return
+    toastTimer.current = setTimeout(() => setToast(null), 4500)
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+    }
+  }, [toast])
+
+  const addRecord = (index: number, serial: string, source: VerificationSource) => {
+    const step = steps[index]
     const record: VerificationRecord = {
       stepId: step.id,
       stepName: step.name,
       serial,
       source,
-      color: step.colors ? selectedColorName : undefined,
+      color: color.name,
       timestamp: Date.now(),
     }
-    setCompleted((prev) => prev.map((c, i) => (i === activeIndex ? true : c)))
     setRecords((prev) => [...prev.filter((r) => r.stepId !== step.id), record])
     void recordsService.add(record).catch(() => undefined)
   }
 
-  const handleConfirm = () => {
-    if (!completed[activeIndex]) return
-    const next = activeIndex + 1
-    if (next < steps.length) setActiveIndex(next)
+  const removeRecord = (index: number) => {
+    const step = steps[index]
+    setRecords((prev) => prev.filter((r) => r.stepId !== step.id))
+    void recordsService.remove(step.id).catch(() => undefined)
   }
 
-  const handleSelectStage = (i: number) => {
-    setActiveIndex(i)
+  // Manual tick-box: tick records a MANUAL verification, untick drops it.
+  const handleToggleCheck = (index: number, checked: boolean) => {
+    if (checked) addRecord(index, steps[index].pn, 'MANUAL')
+    else removeRecord(index)
+  }
+
+  // Camera/OCR pass for the section whose pop-up is open.
+  const handlePass = (serial: string, source: VerificationSource) => {
+    if (verifyIndex == null) return
+    addRecord(verifyIndex, serial, source)
+  }
+
+  const scrollToSection = (index: number) => {
+    sectionRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleSelectStage = (index: number) => {
     setMenuOpen(false)
+    // Defer so the drawer-close transition doesn't fight the scroll.
+    setTimeout(() => scrollToSection(index), 80)
+  }
+
+  // ---- Poka-yoke controls -------------------------------------------------
+  const handleOK = () => {
+    if (allDone) {
+      handleFinish() // plays the finish fanfare itself
+      return
+    }
+    playOk()
+    setToast({ kind: 'info', text: `Continue with ${activeIndex + 1}) ${steps[activeIndex].name}` })
+    scrollToSection(activeIndex)
+  }
+
+  const handleHelp = () => {
+    playHelp()
+    setToast({ kind: 'warn', text: 'Help requested — a line supervisor has been notified.' })
+  }
+
+  const handleProblem = () => {
+    playProblem()
+    setToast({ kind: 'error', text: `Problem reported on ${activeIndex + 1}) ${steps[activeIndex].name} — line flagged for support.` })
+  }
+
+  const handleFinish = () => {
+    setFinishMenuOpen(false)
+    const missing = completed.findIndex((c) => !c)
+    if (missing !== -1) {
+      playError()
+      setToast({ kind: 'error', text: `Please enter a valid material usage for ${missing + 1}) ${steps[missing].name}` })
+      scrollToSection(missing)
+      return
+    }
+    playFinish()
+    setShowCompletion(true)
   }
 
   const handleRestart = () => {
     void recordsService.clear().catch(() => undefined)
     setRecords([])
-    setCompleted(steps.map(() => false))
-    setActiveIndex(0)
-    setSelectedColorName(DEFAULT_COLOR)
+    setColorId(initialColor)
+    setShowCompletion(false)
     setMenuOpen(false)
+    setFinishMenuOpen(false)
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
-    <div className="station">
-      {/* Top bar */}
+    <div
+      className="station"
+      style={
+        {
+          ['--accent']: color.hex,
+          ['--accent-2']: color.hex,
+          ['--accent-weak']: `${color.hex}1f`,
+        } as CSSProperties
+      }
+    >
+      {/* Top bar — hamburger · breadcrumb · Poka-yoke (OK / Help / Problem) */}
       <header className="topbar">
         <button type="button" className="hamburger" onClick={() => setMenuOpen(true)} aria-label="Open menu">
           <span />
@@ -118,46 +213,115 @@ export function AssemblyStation({ onExit }: AssemblyStationProps) {
         </button>
         <nav className="crumb" aria-label="Breadcrumb">
           <span className="crumb-wo mono">{WORK_ORDER}</span>
+          <span className="crumb-icon" aria-hidden="true">🚁</span>
           <span className="crumb-sep">›</span>
           <span className="crumb-mid">Drone Line</span>
           <span className="crumb-sep">›</span>
-          <span className="crumb-cur">Quad Build</span>
+          <span className="crumb-cur">
+            <span className="crumb-swatch" style={{ background: color.hex }} aria-hidden="true" />
+            {color.name} Build
+          </span>
         </nav>
-        <div className="topbar-right">
-          <span className="topbar-stage mono">{doneCount}/{steps.length}</span>
-          <button type="button" className="brand-btn" onClick={onExit} aria-label="Back to home">
-            <img src="/darksvg.png" alt="BRIDGE" className="topbar-logo" />
+        <div className="poka" role="group" aria-label="Poka-yoke controls">
+          <button type="button" className="poka-btn poka-ok" onClick={handleOK}>
+            <span className="poka-dot" aria-hidden="true" />
+            OK
+          </button>
+          <button type="button" className="poka-btn poka-help" onClick={handleHelp}>
+            <span className="poka-dot" aria-hidden="true" />
+            Help
+          </button>
+          <button type="button" className="poka-btn poka-problem" onClick={handleProblem}>
+            <span className="poka-dot" aria-hidden="true" />
+            Problem
           </button>
         </div>
       </header>
 
-      {/* Single-stage production form */}
+      {/* Toast / andon banner */}
+      {toast && (
+        <div className={`toast toast-${toast.kind}`} role="status">
+          <span className="toast-mark" aria-hidden="true">
+            {toast.kind === 'error' ? '⚠' : toast.kind === 'warn' ? 'ℹ' : '✓'}
+          </span>
+          <span className="toast-text">{toast.text}</span>
+          <button type="button" className="toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Single-page production form */}
       <main className="form-scroll" ref={scrollRef}>
         <div className="formbar">
-          <span className="formbar-id mono">{formId}</span>
-          <span className="formbar-name"> / Drone Production Form</span>
+          <div className="formbar-id-wrap">
+            <span className="formbar-id mono">{formId}</span>
+            <span className="formbar-name"> / Drone Production Form</span>
+          </div>
+          <div className="formbar-right">
+            <span className="formbar-count mono">{doneCount}/{steps.length}</span>
+            <span className="formbar-badge">
+              {STATION_ID}
+              <span className="formbar-caret" aria-hidden="true">▾</span>
+            </span>
+          </div>
         </div>
 
-        <InstructionPanel
-          key={activeStep.id}
-          step={activeStep}
-          index={activeIndex}
-          total={steps.length}
-          verified={completed[activeIndex]}
-          record={activeRecord}
-          selectedColorName={selectedColorName}
-          onSelectColor={setSelectedColorName}
-          onVerify={() => setVerifyOpen(true)}
-          onConfirm={handleConfirm}
-        />
+        <div className="psheet">
+          {steps.map((step, i) => (
+            <StageSection
+              key={step.id}
+              ref={(el) => {
+                sectionRefs.current[i] = el
+              }}
+              step={step}
+              index={i}
+              completed={completed[i]}
+              active={hydrated && !allDone && i === activeIndex}
+              record={records.find((r) => r.stepId === step.id)}
+              color={colorId}
+              onToggleCheck={(checked) => handleToggleCheck(i, checked)}
+              onVerify={() => setVerifyIndex(i)}
+              onOpenMedia={(slide) => setMedia({ index: i, slide })}
+            />
+          ))}
+        </div>
       </main>
 
+      {/* Footer — Finish (with caret menu) */}
+      <footer className="station-foot">
+        <span className="foot-progress mono">
+          {doneCount} of {steps.length} sections complete
+        </span>
+        <div className="finish-wrap">
+          <button type="button" className="finish-btn" onClick={handleFinish}>
+            <span className="finish-icon" aria-hidden="true">🔒</span>
+            Finish
+          </button>
+          <button
+            type="button"
+            className="finish-caret"
+            onClick={() => setFinishMenuOpen((v) => !v)}
+            aria-label="More finish options"
+            aria-expanded={finishMenuOpen}
+          >
+            ▾
+          </button>
+          {finishMenuOpen && (
+            <div className="finish-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setFinishMenuOpen(false); onExit() }}>
+                Save &amp; exit
+              </button>
+              <button type="button" role="menuitem" onClick={handleRestart}>
+                Restart build
+              </button>
+            </div>
+          )}
+        </div>
+      </footer>
+
       {/* ☰ Drawer: stage list + traceability log */}
-      <div
-        className={`drawer-scrim${menuOpen ? ' is-open' : ''}`}
-        onClick={() => setMenuOpen(false)}
-        aria-hidden="true"
-      />
+      <div className={`drawer-scrim${menuOpen ? ' is-open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
       <aside className={`drawer${menuOpen ? ' is-open' : ''}`} aria-hidden={!menuOpen}>
         <header className="drawer-head">
           <img src="/darksvg.png" alt="BRIDGE" className="drawer-logo" />
@@ -182,21 +346,35 @@ export function AssemblyStation({ onExit }: AssemblyStationProps) {
           </div>
         </section>
 
-        <StepRail steps={steps} completed={completed} activeIndex={activeIndex} onSelect={handleSelectStage} />
-        <TraceabilityLog records={records} operator={OPERATOR} />
+        <div className="drawer-scroll">
+          <StepRail steps={steps} completed={completed} activeIndex={activeIndex} onSelect={handleSelectStage} />
+          <TraceabilityLog records={records} operator={OPERATOR} />
+        </div>
 
         <button type="button" className="drawer-exit" onClick={onExit}>
           Exit to home
         </button>
       </aside>
 
+      {/* Media lightbox */}
+      {media && (
+        <Lightbox
+          step={steps[media.index]}
+          color={colorId}
+          startSlide={media.slide}
+          onClose={() => setMedia(null)}
+        />
+      )}
+
       {/* Camera verification pop-up */}
-      {verifyOpen && (
-        <VerificationModal step={activeStep} onPass={handlePass} onClose={() => setVerifyOpen(false)} />
+      {verifyIndex != null && (
+        <VerificationModal step={steps[verifyIndex]} onPass={handlePass} onClose={() => setVerifyIndex(null)} />
       )}
 
       {/* Completion */}
-      {allDone && <CompletionCard stageCount={steps.length} unitSerial={UNIT_SERIAL} onRestart={handleRestart} />}
+      {showCompletion && allDone && (
+        <CompletionCard stageCount={steps.length} unitSerial={UNIT_SERIAL} onRestart={handleRestart} />
+      )}
     </div>
   )
 }

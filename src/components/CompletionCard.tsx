@@ -23,7 +23,7 @@ export function CompletionCard({ stageCount, unitSerial, onRestart }: Completion
 
         <h2 className="completion-title">Build Verified</h2>
         <p className="completion-summary mono">
-          {stageCount}/{stageCount} stages · 0 defects · 1 unit serialised
+          {stageCount}/{stageCount} parts · 0 defects · 1 unit serialised
         </p>
 
         <div className="completion-serial">

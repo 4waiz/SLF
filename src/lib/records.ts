@@ -12,6 +12,8 @@ import type { VerificationRecord } from '../types'
 export interface RecordsService {
   /** Record a stage verification (upsert keyed by stepId). */
   add(record: VerificationRecord): Promise<void>
+  /** Drop a single stage's verification (e.g. operator un-ticks the part). */
+  remove(stepId: string): Promise<void>
   /** All records for the current build, oldest first. */
   list(): Promise<VerificationRecord[]>
   /** Wipe the log (e.g. when a new build starts). */
@@ -61,6 +63,17 @@ class IndexedDbRecordsService implements RecordsService {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error ?? new Error('IndexedDB write failed'))
       tx.onabort = () => reject(tx.error ?? new Error('IndexedDB write aborted'))
+    })
+  }
+
+  async remove(stepId: string): Promise<void> {
+    const db = await this.db()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite')
+      tx.objectStore(STORE).delete(stepId)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error ?? new Error('IndexedDB delete failed'))
+      tx.onabort = () => reject(tx.error ?? new Error('IndexedDB delete aborted'))
     })
   }
 

@@ -1,12 +1,20 @@
+import { useState } from 'react'
+import type { DroneColorId } from '../types'
+import { steps } from '../data/steps'
+import { ColorChoiceModal } from './ColorChoiceModal'
+
 interface IntroScreenProps {
-  onStart: () => void
+  onStart: (color: DroneColorId) => void
 }
 
 /**
  * Post-login home: BRIDGE mark + the two product entries.
- * Logo → subtitle → buttons fade/rise in on a staggered timeline.
+ * Logo → subtitle → buttons fade/rise in on a staggered timeline. Tapping
+ * "Assemble Drone" opens the colour-choice pop-up before the build begins.
  */
 export function IntroScreen({ onStart }: IntroScreenProps) {
+  const [picking, setPicking] = useState(false)
+
   return (
     <div className="intro">
       <div className="intro-aurora" aria-hidden="true" />
@@ -23,10 +31,10 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
         </p>
 
         <div className="intro-rise intro-actions" style={{ animationDelay: '0.55s' }}>
-          <button type="button" className="product-btn is-primary" onClick={onStart}>
+          <button type="button" className="product-btn is-primary" onClick={() => setPicking(true)}>
             <span className="product-btn-kicker">Build Line A</span>
             <span className="product-btn-title">Assemble Drone</span>
-            <span className="product-btn-meta">7 stages · vision-verified</span>
+            <span className="product-btn-meta">{steps.length} parts · vision-verified</span>
           </button>
 
           <button type="button" className="product-btn is-locked" disabled aria-disabled="true">
@@ -42,6 +50,16 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           BRIDGE Station Platform · v1.0
         </footer>
       </main>
+
+      {picking && (
+        <ColorChoiceModal
+          onConfirm={(color) => {
+            setPicking(false)
+            onStart(color)
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </div>
   )
 }
