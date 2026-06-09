@@ -2,9 +2,11 @@ import { useState } from 'react'
 import type { DroneColorId } from './types'
 import { LoginScreen } from './components/LoginScreen'
 import { IntroScreen } from './components/IntroScreen'
+import { RoundsHub } from './components/RoundsHub'
 import { AssemblyStation } from './components/AssemblyStation'
 
-type View = 'login' | 'home' | 'station'
+// login → home → rounds (Round 1 mobile scan + launch Round 2) → station (Round 2)
+type View = 'login' | 'home' | 'rounds' | 'station'
 
 export default function App() {
   const [view, setView] = useState<View>('login')
@@ -20,11 +22,14 @@ export default function App() {
         <IntroScreen
           onStart={(c) => {
             setColor(c)
-            setView('station')
+            setView('rounds')
           }}
         />
       )}
-      {view === 'station' && <AssemblyStation initialColor={color} onExit={() => setView('home')} />}
+      {view === 'rounds' && (
+        <RoundsHub onProceed={() => setView('station')} onBack={() => setView('home')} />
+      )}
+      {view === 'station' && <AssemblyStation initialColor={color} onExit={() => setView('rounds')} />}
     </div>
   )
 }

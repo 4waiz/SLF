@@ -11,6 +11,9 @@ dist
 dist-ssr
 *.local
 
+# Self-signed TLS cert for the Round 1 mobile server (generated locally)
+server/.cert
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

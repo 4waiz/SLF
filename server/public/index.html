@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Mobile-first; lock zoom so the scanner frame stays put. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#080b11" />
+    <link rel="icon" type="image/svg+xml" href="/bridge.svg" />
+    <title>BRIDGE · Round 1 Scanner</title>
+
+    <!-- Same type system as the laptop app: Chakra Petch · IBM Plex Sans/Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <!-- App shell texture, identical to the laptop station -->
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Connection pill (top-right, always visible) -->
+    <div id="conn" class="conn conn--down" title="Connection to station">
+      <span class="conn-dot"></span><span id="conn-label">Connecting…</span>
+    </div>
+
+    <!-- ===================== LOGIN ===================== -->
+    <section id="view-login" class="login view">
+      <div class="intro-aurora" aria-hidden="true"></div>
+      <main class="login-card">
+        <img src="/animated%20logo.gif" alt="BRIDGE" class="brand-img brand-lg intro-rise" style="animation-delay:.05s" />
+        <p class="subtitle intro-rise" style="animation-delay:.3s">SLF · Round 1 · Mobile Barcode Scan</p>
+
+        <form id="login-form" class="login-form intro-rise" style="animation-delay:.5s" autocomplete="on">
+          <label class="login-field">
+            <span>Operator ID</span>
+            <input id="username" type="text" inputmode="text" placeholder="Operator" autocomplete="username" autofocus required />
+          </label>
+          <label class="login-field">
+            <span>Passcode</span>
+            <input id="password" type="password" placeholder="••••" autocomplete="current-password" required />
+          </label>
+          <p id="login-error" class="login-error hidden" role="alert"></p>
+          <button class="login-btn" type="submit">Sign In</button>
+        </form>
+
+        <p class="login-foot intro-rise" style="animation-delay:.7s">Demo login · Operator / 123</p>
+      </main>
+    </section>
+
+    <!-- ===================== INTRO ===================== -->
+    <section id="view-intro" class="login view hidden">
+      <div class="intro-aurora" aria-hidden="true"></div>
+      <main class="login-card">
+        <img src="/animated%20logo.gif" alt="BRIDGE" class="brand-img brand-lg" />
+        <p class="subtitle">SLF · Round 1 · Mobile Barcode Scan</p>
+
+        <div class="login-form">
+          <h2 class="intro-h">Scan the parts</h2>
+          <ol class="steps">
+            <li>The laptop shows the part to scan — its name appears here.</li>
+            <li>Point the camera at that part's barcode.</li>
+            <li>It turns green on the laptop and moves to the next part.</li>
+          </ol>
+          <p class="intro-parts-line">Scan the <b id="intro-count">26</b> parts <b>in order</b>.</p>
+          <button id="start-btn" class="login-btn">Start Scanning</button>
+        </div>
+      </main>
+    </section>
+
+    <!-- ===================== SCANNER ===================== -->
+    <section id="view-scanner" class="scanner view hidden">
+      <header class="scan-head">
+        <button id="back-btn" class="iconbtn" aria-label="Back">‹</button>
+        <img src="/darksvg.png" alt="BRIDGE" class="scan-logo" />
+        <span class="scan-count mono" id="scan-count">0/26</span>
+      </header>
+
+      <!-- Camera viewport (fills the screen) with decorative scanning frame -->
+      <div class="stage">
+        <div id="reader"></div>
+        <div class="frame" aria-hidden="true">
+          <span class="corner tl"></span><span class="corner tr"></span>
+          <span class="corner bl"></span><span class="corner br"></span>
+          <div class="laser"></div>
+        </div>
+        <div id="cam-error" class="cam-error hidden">
+          <div class="cam-error-box">
+            <div class="cam-error-icon">📷</div>
+            <p id="cam-error-msg">Camera unavailable.</p>
+            <ul class="cam-tips">
+              <li>Allow camera access when prompted.</li>
+              <li>This page must be <b>https://</b> (accept the security warning).</li>
+              <li>Close other apps using the camera.</li>
+            </ul>
+            <button id="retry-btn" class="login-btn">Retry camera</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fixed bottom status: which part to scan + the last scan result -->
+      <div class="scan-status">
+        <div id="scan-target" class="scan-target idle">Waiting for the station…</div>
+        <div id="result" class="result result--idle">
+          <span id="result-icon" class="result-icon">⎙</span>
+          <span id="result-text">Ready — point at a barcode</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Socket.IO client is served by the mobile server itself -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Camera barcode scanner (vendored locally so no internet is needed) -->
+    <script src="/vendor/html5-qrcode.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

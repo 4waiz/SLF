@@ -558,6 +558,55 @@ video {
   font-size: 10px;
   opacity: 0.85;
 }
+/* Round indicator + phone-link status in the form bar */
+.formbar-round {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.formbar-round.r1 {
+  color: var(--accent);
+  background: var(--accent-weak);
+  border-color: var(--accent);
+}
+.formbar-round.r2 {
+  color: var(--ink-2);
+  background: var(--card-2);
+}
+.formbar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  white-space: nowrap;
+}
+.formbar-link-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.formbar-link.is-up {
+  color: #0a7d52;
+}
+.formbar-link.is-up .formbar-link-dot {
+  background: #16a36a;
+  box-shadow: 0 0 6px #16a36a;
+}
+.formbar-link.is-down {
+  color: #b03b46;
+}
+.formbar-link.is-down .formbar-link-dot {
+  background: #d8505c;
+}
 
 .form {
   max-width: 820px;
@@ -866,6 +915,46 @@ video {
 }
 .verify-btn-icon {
   font-size: 18px;
+}
+
+/* Round 1: mobile-scan status (same footprint as verify-btn, but a status not a button) */
+.scan-status-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 20px;
+  min-height: 58px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink-3);
+  background: var(--card-2);
+  border: 1.5px dashed var(--line);
+}
+.scan-status-btn.is-armed {
+  color: var(--accent);
+  background: var(--accent-weak);
+  border-style: solid;
+  border-color: var(--accent);
+}
+.scan-status-btn.is-done {
+  color: var(--accent);
+  background: #fff;
+  border: 1.5px solid var(--accent);
+}
+.scan-pulse {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: scanPulse 1.3s ease-in-out infinite;
+}
+@keyframes scanPulse {
+  0%, 100% { transform: scale(0.7); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 1; }
 }
 
 /* confirm */
@@ -1867,6 +1956,26 @@ video {
 .completion-btn:hover {
   background: var(--accent-2);
 }
+.intermission-note {
+  margin: 8px 0 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.intermission-note b {
+  color: var(--ink);
+}
+.intermission-review {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: transparent;
+}
+.intermission-review:hover {
+  color: var(--ink);
+}
 
 /* ============================================================================
    RESPONSIVE + MOTION
@@ -2810,4 +2919,244 @@ video {
   .cc-start-btn {
     width: 100%;
   }
+}
+
+/* =========================================================================
+   Rounds hub — connect gate (link the phone, then Proceed to Round 1)
+   ========================================================================= */
+.rounds {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 28px clamp(16px, 4vw, 48px) 20px;
+}
+.rounds-head {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.rounds-logo {
+  height: 64px;
+  width: auto;
+  margin: 0 auto 4px; /* center the (display:block) brand image at the top */
+}
+.rounds-head .subtitle {
+  margin-top: 6px;
+}
+
+.gate {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+.gate-card {
+  position: relative;
+  width: min(540px, 94vw);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(8px);
+}
+.round-kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+.round-title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+}
+.round-desc {
+  margin: 8px 0 16px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Join block: QR + URL */
+.round-join {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+.round-qr {
+  flex: 0 0 auto;
+  width: 104px;
+  height: 104px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  display: grid;
+  place-items: center;
+}
+.round-qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.round-qr-fallback {
+  font-size: 11px;
+  color: #333;
+  text-align: center;
+  padding: 6px;
+}
+.round-join-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.round-join-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+.round-url {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--teal-2);
+  word-break: break-all;
+}
+.round-join-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+/* Link status — gates the Proceed button */
+.gate-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.gate-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.gate-status.is-down {
+  color: var(--text-dim);
+}
+.gate-status.is-down .gate-status-dot {
+  background: var(--text-mute);
+}
+.gate-status.is-waiting {
+  color: var(--amber);
+  border-color: var(--amber-ghost);
+}
+.gate-status.is-waiting .gate-status-dot {
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+}
+.gate-status.is-ready {
+  color: var(--teal);
+  border-color: var(--teal-ghost);
+}
+.gate-status.is-ready .gate-status-dot {
+  background: var(--teal);
+  box-shadow: 0 0 8px var(--teal);
+}
+
+.round-open-btn {
+  width: 100%;
+  padding: 15px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--teal), var(--teal-2));
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.12s;
+}
+.round-open-btn:not(:disabled):hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.round-open-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+/* Two-round explainer */
+.gate-rounds {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+}
+.gate-rounds li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.gate-rounds li b {
+  color: var(--text);
+}
+.gate-round-no {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--teal);
+  background: var(--teal-ghost);
+  border: 1px solid var(--teal-ghost);
+}
+
+.rounds-bottom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 540px;
+  width: 100%;
+  margin: 18px auto 0;
+}
+.rounds-back {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+.rounds-back:hover {
+  border-color: var(--border-2);
+  color: var(--text);
 }

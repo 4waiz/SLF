@@ -8,8 +8,10 @@ import { StepRail } from './StepRail'
 import { StageSection } from './StageSection'
 import { TraceabilityLog } from './TraceabilityLog'
 import { CompletionCard } from './CompletionCard'
+import { RoundIntermission } from './RoundIntermission'
 import { Lightbox } from './Lightbox'
 import { VerificationModal } from './VisionVerification'
+import { useStationScan } from '../lib/mobileLink'
 
 interface AssemblyStationProps {
   /** Colour-way chosen in the build-start pop-up. */
@@ -39,6 +41,9 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
   const [toast, setToast] = useState<Toast>(null)
   const [finishMenuOpen, setFinishMenuOpen] = useState(false)
   const [showCompletion, setShowCompletion] = useState(false)
+  // Round 1 = mobile barcode scan; Round 2 = laptop camera/OCR (the original flow).
+  const [round, setRound] = useState<1 | 2>(1)
+  const [r1Reviewing, setR1Reviewing] = useState(false) // dismissed the Round-1 done overlay
 
   const scrollRef = useRef<HTMLElement>(null)
   const sectionRefs = useRef<(HTMLElement | null)[]>([])
@@ -133,6 +138,46 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
     else removeRecord(index)
   }
 
+  // ---- Round 1: mobile barcode scan -------------------------------------
+  // A phone scan that matched the expected part arrives here → record it as
+  // SCAN-verified, which ticks the part green and advances the frontier.
+  const handleScanVerified = (pn: string) => {
+    if (round !== 1) return
+    const index = steps.findIndex((s) => s.pn === pn)
+    if (index === -1 || completed[index]) return
+    addRecord(index, pn, 'SCAN')
+  }
+  const { connected: scanConnected, setTarget, reset: resetScan } = useStationScan(handleScanVerified)
+
+  // Publish the part the phone should scan next (Round 1 only). Cleared in
+  // Round 2 / once complete so the phone shows the right prompt.
+  useEffect(() => {
+    if (!hydrated) return
+    if (round !== 1 || allDone) {
+      setTarget(null)
+      return
+    }
+    const s = steps[activeIndex]
+    setTarget({ pn: s.pn, name: s.name, index: activeIndex, total: steps.length })
+    // setTarget emits over the shared socket and is stable; deps intentionally minimal.
+  }, [round, activeIndex, allDone, hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Let the Round-1 hand-off overlay reappear if a finished part is later unticked.
+  useEffect(() => {
+    if (!allDone && r1Reviewing) setR1Reviewing(false)
+  }, [allDone, r1Reviewing])
+
+  // Round 1 fully scanned → start Round 2 (laptop camera/OCR) on a clean slate.
+  const handleStartRound2 = () => {
+    resetScan()
+    void recordsService.clear().catch(() => undefined)
+    setRecords([])
+    setRound(2)
+    setR1Reviewing(false)
+    prevActive.current = null
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // Camera/OCR pass for the section whose pop-up is open.
   const handlePass = (serial: string, source: VerificationSource) => {
     if (verifyIndex == null) return
@@ -175,21 +220,27 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
     const missing = completed.findIndex((c) => !c)
     if (missing !== -1) {
       playError()
-      setToast({ kind: 'error', text: `Please enter a valid material usage for ${missing + 1}) ${steps[missing].name}` })
+      const how = round === 1 ? 'Scan' : 'Verify'
+      setToast({ kind: 'error', text: `${how} ${missing + 1}) ${steps[missing].name} to continue` })
       scrollToSection(missing)
       return
     }
     playFinish()
-    setShowCompletion(true)
+    if (round === 1) setR1Reviewing(false) // surface the Round-1 → Round-2 hand-off
+    else setShowCompletion(true)
   }
 
   const handleRestart = () => {
+    resetScan()
     void recordsService.clear().catch(() => undefined)
     setRecords([])
     setColorId(initialColor)
+    setRound(1)
+    setR1Reviewing(false)
     setShowCompletion(false)
     setMenuOpen(false)
     setFinishMenuOpen(false)
+    prevActive.current = null
     scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -259,6 +310,15 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
             <span className="formbar-name"> / Drone Production Form</span>
           </div>
           <div className="formbar-right">
+            <span className={`formbar-round r${round}`}>
+              Round {round} · {round === 1 ? 'Mobile Scan' : 'Laptop Scan'}
+            </span>
+            {round === 1 && (
+              <span className={`formbar-link ${scanConnected ? 'is-up' : 'is-down'}`} title="Phone scanner link">
+                <span className="formbar-link-dot" aria-hidden="true" />
+                {scanConnected ? 'Phone linked' : 'Phone offline'}
+              </span>
+            )}
             <span className="formbar-count mono">{doneCount}/{steps.length}</span>
             <span className="formbar-badge">
               {STATION_ID}
@@ -278,6 +338,7 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
               index={i}
               completed={completed[i]}
               active={hydrated && !allDone && i === activeIndex}
+              round={round}
               record={records.find((r) => r.stepId === step.id)}
               color={colorId}
               onToggleCheck={(checked) => handleToggleCheck(i, checked)}
@@ -371,8 +432,17 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
         <VerificationModal step={steps[verifyIndex]} onPass={handlePass} onClose={() => setVerifyIndex(null)} />
       )}
 
-      {/* Completion */}
-      {showCompletion && allDone && (
+      {/* Round 1 complete → hand off to Round 2 (laptop scan) */}
+      {round === 1 && allDone && !r1Reviewing && (
+        <RoundIntermission
+          partCount={steps.length}
+          onStartRound2={handleStartRound2}
+          onReview={() => setR1Reviewing(true)}
+        />
+      )}
+
+      {/* Final completion (after Round 2) */}
+      {showCompletion && allDone && round === 2 && (
         <CompletionCard stageCount={steps.length} unitSerial={UNIT_SERIAL} onRestart={handleRestart} />
       )}
     </div>

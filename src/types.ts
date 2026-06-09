@@ -24,7 +24,8 @@ export interface AssemblyStep {
   videoSrc?: string // optional mp4 path; placeholder if absent
 }
 
-export type VerificationSource = 'OCR' | 'MANUAL'
+// SCAN = verified by the Round 1 mobile barcode scanner; OCR/MANUAL = Round 2.
+export type VerificationSource = 'OCR' | 'MANUAL' | 'SCAN'
 
 export interface VerificationRecord {
   stepId: string

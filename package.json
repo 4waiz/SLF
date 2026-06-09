@@ -6,14 +6,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "mobile": "node server/mobile-server.mjs",
+    "dev:all": "node scripts/dev-all.mjs",
+    "barcodes": "node scripts/gen-barcodes.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "bwip-js": "^4.11.1",
+    "express": "^5.2.1",
+    "html5-qrcode": "^2.3.8",
     "pngjs": "^7.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "selfsigned": "^5.5.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "tesseract.js": "^5.1.1"
   },
   "devDependencies": {

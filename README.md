@@ -37,6 +37,57 @@ manually from the Vision Verification block at any time.
 
 ---
 
+## Two-round scanning
+
+After sign-in and **Assemble Drone**, the station shows a **Rounds** hub:
+
+- **Round 1 — Mobile Barcode Scan:** use your phone as a barcode reader. Parts
+  **Part 1 / Part 2 / Part 3** tick off on the laptop in real time as the phone
+  scans them.
+- **Round 2 — Laptop Scan:** the existing on-screen, camera/OCR work-instruction
+  flow (unchanged) — opens from the hub.
+
+### Run it
+
+```bash
+npm install
+npm run dev:all      # laptop app (:5173) + mobile scan server (:3001) together
+```
+
+Or run them separately in two terminals: `npm run dev` and `npm run mobile`.
+Open the laptop app at `http://localhost:5173`, sign in (**Operator / 123**),
+choose a colour, and you land on the **Rounds** hub.
+
+> **One-time cert trust (laptop):** the mobile server uses a self-signed HTTPS
+> cert so phone cameras work. If Round 1 shows *"Waiting for server…"*, open
+> **https://localhost:3001** once in the laptop browser, accept the warning, then
+> reload the app.
+
+### Open the mobile scanner
+
+The mobile URL is **`https://<laptop-ip>:3001`** — it's printed in the console
+on startup and shown (with a QR code) in the Round 1 card. On your phone (same
+Wi-Fi):
+
+1. Scan the QR code, or type the URL.
+2. Accept the one-time security warning (**Advanced → proceed**) — needed for the
+   camera on a LAN IP.
+3. Sign in (**Operator / 123**) → **Start Scanning** → allow camera access.
+
+### Test barcodes
+
+Printable Code-128 PNGs live in **`generated_barcodes/`**:
+`part_1_barcode.png`, `part_2_barcode.png`, `part_3_barcode.png` (encoding
+`PART_1` / `PART_2` / `PART_3`). Print them, or just display them on a second
+screen, and scan with the phone. Regenerate any time with `npm run barcodes`.
+
+Point the phone at a barcode → the phone shows **"Scanned: Part 1"** and the
+laptop's Round 1 card ticks **Part 1**. Unknown barcodes show **"Unknown
+barcode"** and are ignored. The accepted mapping is one file —
+[`shared/parts.json`](shared/parts.json).
+
+---
+
 ## How it works
 
 ### Flow
@@ -71,9 +122,18 @@ With a camera and decent lighting, point it at the expected number (e.g. print
 ## Architecture
 
 ```
+shared/parts.json           accepted barcode → part-name map (single source of truth)
+generated_barcodes/         printable Code-128 PNGs for Part 1/2/3 (npm run barcodes)
+scripts/
+  gen-barcodes.mjs          barcode generator (bwip-js)
+  dev-all.mjs               runs Vite + mobile server together (npm run dev:all)
+server/
+  mobile-server.mjs         Round 1: HTTPS (self-signed) + Socket.IO + REST on :3001
+  public/                   mobile scanner UI (login → intro → camera scanner)
+    index.html · styles.css · app.js · vendor/html5-qrcode.min.js
 src/
   main.tsx                  app entry
-  App.tsx                   intro ↔ station view state
+  App.tsx                   login → home → rounds → station view state
   types.ts                  domain model
   data/steps.ts             the 7 AssemblyStep records + operator/station ids
   styles/global.css         design tokens + every component style
@@ -82,10 +142,12 @@ src/
     records.ts              RecordsService interface + IndexedDB implementation
   hooks/
     useCamera.ts            getUserMedia + frame capture
+    useRound1.ts            Round 1 Socket.IO live link to the mobile server
   components/
     BridgeLogo.tsx          animated SVG bridge
     IntroScreen.tsx
-    AssemblyStation.tsx     owns build state, lays out the 3 regions
+    RoundsHub.tsx           Round 1 (live mobile scan) + Round 2 launch
+    AssemblyStation.tsx     Round 2 — owns build state, lays out the 3 regions
     StepRail.tsx
     InstructionPanel.tsx    image → part row → instruction → verification → VIDEO
     PartFigure.tsx          inline SVG per PartKind (no external assets)

@@ -9,12 +9,14 @@ interface StageSectionProps {
   completed: boolean
   /** The current frontier section the operator should be working on. */
   active: boolean
+  /** Round 1 = verify by mobile barcode scan; Round 2 = laptop camera/OCR. */
+  round: 1 | 2
   record?: VerificationRecord
   /** The colour-way being built — selects which part render to show. */
   color: DroneColorId
   /** Manual tick / untick of the BOM checkbox. */
   onToggleCheck: (checked: boolean) => void
-  /** Opens the camera/OCR pop-up for this section. */
+  /** Opens the camera/OCR pop-up for this section (Round 2 only). */
   onVerify: () => void
   /** Opens the media lightbox at the given slide (0 = image, 1 = clip). */
   onOpenMedia: (slide: number) => void
@@ -28,9 +30,12 @@ interface StageSectionProps {
  * operator chose at build-start.
  */
 export const StageSection = forwardRef<HTMLElement, StageSectionProps>(function StageSection(
-  { step, index, completed, active, record, color, onToggleCheck, onVerify, onOpenMedia },
+  { step, index, completed, active, round, record, color, onToggleCheck, onVerify, onOpenMedia },
   ref,
 ) {
+  // Round 1 verifies by mobile scan (no laptop camera). The active, not-yet-done
+  // part is the one the phone should scan next.
+  const awaitingScan = round === 1 && active && !completed
   const [showDesc, setShowDesc] = useState(true)
   const sku = step.code.split(' · ')[1] ?? step.code
 
@@ -112,28 +117,58 @@ export const StageSection = forwardRef<HTMLElement, StageSectionProps>(function 
           <span className="bom-qty mono">{step.qty}</span>
         </button>
 
-        {/* Camera / OCR verify (kept alongside the tick-box) */}
+        {/* Verify row — Round 1: mobile barcode scan · Round 2: laptop camera/OCR */}
         <div className="verify-block">
           <div className={`serial-field${completed ? ' is-ok' : ''}`}>
             <span className="serial-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <rect x="3" y="6" width="18" height="13" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M8 6 L9.5 3.5 L14.5 3.5 L16 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                <circle cx="12" cy="12.5" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
-              </svg>
+              {round === 1 ? (
+                <svg viewBox="0 0 24 24">
+                  <rect x="6" y="3" width="12" height="18" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M10 6 h4 M11 18 h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24">
+                  <rect x="3" y="6" width="18" height="13" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M8 6 L9.5 3.5 L14.5 3.5 L16 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                  <circle cx="12" cy="12.5" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                </svg>
+              )}
             </span>
             <div className="serial-content">
-              <span className="serial-label">Detected serial</span>
-              <span className="serial-value mono">{completed && record ? record.serial : 'Not scanned yet'}</span>
+              <span className="serial-label">{round === 1 ? 'Mobile scan' : 'Detected serial'}</span>
+              <span className="serial-value mono">
+                {completed && record
+                  ? record.serial
+                  : round === 1
+                    ? awaitingScan
+                      ? 'Waiting for phone scan…'
+                      : 'Scan in order'
+                    : 'Not scanned yet'}
+              </span>
             </div>
             {completed && record && <span className={`serial-source src-${record.source.toLowerCase()}`}>{record.source}</span>}
           </div>
-          <button type="button" className={`verify-btn${completed ? ' is-done' : ''}`} onClick={onVerify}>
-            <span className="verify-btn-icon" aria-hidden="true">
-              {completed ? '↻' : '⦿'}
-            </span>
-            {completed ? 'Re-scan' : 'Verify Part'}
-          </button>
+
+          {round === 1 ? (
+            // Round 1: status only — verification arrives from the phone (no click).
+            <div
+              className={`scan-status-btn${completed ? ' is-done' : awaitingScan ? ' is-armed' : ''}`}
+              aria-live="polite"
+            >
+              <span className="verify-btn-icon" aria-hidden="true">
+                {completed ? '✓' : awaitingScan ? <span className="scan-pulse" /> : '⦿'}
+              </span>
+              {completed ? 'Verified by mobile' : 'Verify using Mobile Scanner'}
+            </div>
+          ) : (
+            // Round 2: the existing laptop camera / OCR pop-up.
+            <button type="button" className={`verify-btn${completed ? ' is-done' : ''}`} onClick={onVerify}>
+              <span className="verify-btn-icon" aria-hidden="true">
+                {completed ? '↻' : '⦿'}
+              </span>
+              {completed ? 'Re-scan' : 'Verify Part'}
+            </button>
+          )}
         </div>
       </div>
     </article>
