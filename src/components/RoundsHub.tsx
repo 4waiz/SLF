@@ -33,7 +33,7 @@ export function RoundsHub({ onStartRound, onBack }: RoundsHubProps) {
 
       <header className="rounds-head">
         <img src="/animated%20logo.gif" alt="BRIDGE" className="brand-img rounds-logo" />
-        <p className="subtitle">SLF · Two-Round Verification</p>
+        <p className="subtitle">Vortex Production Line · Two-Round Verification</p>
       </header>
 
       <main className="rounds-two">

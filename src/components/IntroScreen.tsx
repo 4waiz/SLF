@@ -27,7 +27,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           style={{ animationDelay: '0.05s' }}
         />
         <p className="subtitle intro-rise" style={{ animationDelay: '0.3s' }}>
-          SLF · Digital Work Instructions
+          Vortex Production Line
         </p>
 
         <div className="intro-rise intro-actions" style={{ animationDelay: '0.55s' }}>

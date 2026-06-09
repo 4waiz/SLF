@@ -36,7 +36,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           style={{ animationDelay: '0.05s' }}
         />
         <p className="subtitle intro-rise" style={{ animationDelay: '0.35s' }}>
-          SLF · Digital Work Instructions
+          Vortex Production Line
         </p>
 
         <form className="login-form intro-rise" style={{ animationDelay: '0.55s' }} onSubmit={handleSubmit}>
@@ -48,7 +48,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               autoFocus
-              placeholder="Operator"
             />
           </label>
           <label className="login-field">
