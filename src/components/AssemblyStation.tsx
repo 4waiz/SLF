@@ -16,6 +16,8 @@ import { useStationScan } from '../lib/mobileLink'
 interface AssemblyStationProps {
   /** Colour-way chosen in the build-start pop-up. */
   initialColor: DroneColorId
+  /** Which round to run: 1 = mobile barcode scan, 2 = laptop camera/OCR. */
+  initialRound: 1 | 2
   onExit: () => void
 }
 
@@ -31,7 +33,7 @@ type MediaTarget = { index: number; slide: number } | null
  * drawer holds the stage list + traceability log; the green/amber/red Poka-yoke
  * controls (OK · Help · Problem) live in the top bar; Finish sits in the footer.
  */
-export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) {
+export function AssemblyStation({ initialColor, initialRound, onExit }: AssemblyStationProps) {
   const [records, setRecords] = useState<VerificationRecord[]>([])
   const [colorId, setColorId] = useState<DroneColorId>(initialColor)
   const [hydrated, setHydrated] = useState(false)
@@ -41,8 +43,9 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
   const [toast, setToast] = useState<Toast>(null)
   const [finishMenuOpen, setFinishMenuOpen] = useState(false)
   const [showCompletion, setShowCompletion] = useState(false)
-  // Round 1 = mobile barcode scan; Round 2 = laptop camera/OCR (the original flow).
-  const [round, setRound] = useState<1 | 2>(1)
+  // Round 1 = mobile barcode scan; Round 2 = laptop camera/OCR. The round is
+  // chosen on the hub and fixed for this visit (the two rounds are independent).
+  const round = initialRound
   const [r1Reviewing, setR1Reviewing] = useState(false) // dismissed the Round-1 done overlay
 
   const scrollRef = useRef<HTMLElement>(null)
@@ -50,24 +53,18 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
   const prevActive = useRef<number | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  // Restore any in-progress build from IndexedDB on mount (survives reload).
+  // Each round chosen from the hub is a fresh pass. Records are keyed by stepId,
+  // so the two rounds can't coexist in the store — start this round clean.
   useEffect(() => {
     let alive = true
     recordsService
-      .list()
-      .then((recs) => {
-        if (!alive) return
-        setRecords(recs)
-        // A restored in-progress build keeps its original colour-way.
-        const restoredName = recs.find((r) => r.color)?.color
-        const restored = DRONE_COLORS.find((c) => c.name === restoredName)
-        if (restored) setColorId(restored.id)
-      })
-      .catch(() => {
-        // Unreadable store → start a fresh build.
-      })
+      .clear()
+      .catch(() => undefined)
       .finally(() => {
-        if (alive) setHydrated(true)
+        if (alive) {
+          setRecords([])
+          setHydrated(true)
+        }
       })
     return () => {
       alive = false
@@ -162,21 +159,10 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
     // setTarget emits over the shared socket and is stable; deps intentionally minimal.
   }, [round, activeIndex, allDone, hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Let the Round-1 hand-off overlay reappear if a finished part is later unticked.
+  // Let the Round-1 done overlay reappear if a finished part is later unticked.
   useEffect(() => {
     if (!allDone && r1Reviewing) setR1Reviewing(false)
   }, [allDone, r1Reviewing])
-
-  // Round 1 fully scanned → start Round 2 (laptop camera/OCR) on a clean slate.
-  const handleStartRound2 = () => {
-    resetScan()
-    void recordsService.clear().catch(() => undefined)
-    setRecords([])
-    setRound(2)
-    setR1Reviewing(false)
-    prevActive.current = null
-    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }
 
   // Camera/OCR pass for the section whose pop-up is open.
   const handlePass = (serial: string, source: VerificationSource) => {
@@ -226,16 +212,15 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
       return
     }
     playFinish()
-    if (round === 1) setR1Reviewing(false) // surface the Round-1 → Round-2 hand-off
+    if (round === 1) setR1Reviewing(false) // surface the Round-1 "complete" overlay
     else setShowCompletion(true)
   }
 
   const handleRestart = () => {
-    resetScan()
+    if (round === 1) resetScan()
     void recordsService.clear().catch(() => undefined)
     setRecords([])
     setColorId(initialColor)
-    setRound(1)
     setR1Reviewing(false)
     setShowCompletion(false)
     setMenuOpen(false)
@@ -432,11 +417,11 @@ export function AssemblyStation({ initialColor, onExit }: AssemblyStationProps) 
         <VerificationModal step={steps[verifyIndex]} onPass={handlePass} onClose={() => setVerifyIndex(null)} />
       )}
 
-      {/* Round 1 complete → hand off to Round 2 (laptop scan) */}
+      {/* Round 1 complete → back to the hub to pick Round 2 */}
       {round === 1 && allDone && !r1Reviewing && (
         <RoundIntermission
           partCount={steps.length}
-          onStartRound2={handleStartRound2}
+          onBackToRounds={onExit}
           onReview={() => setR1Reviewing(true)}
         />
       )}

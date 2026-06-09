@@ -158,9 +158,17 @@ function broadcastMobileStatus() {
   io.emit('mobile-status', { signedIn: signedInPhones.size > 0, count: signedInPhones.size })
 }
 
+function helloPayload() {
+  return { urls: urls(), parts: PARTS, ...statePayload() }
+}
+
 io.on('connection', (socket) => {
   // Tell the just-connected client everything it needs to render immediately.
-  socket.emit('hello', { urls: urls(), parts: PARTS, ...statePayload() })
+  socket.emit('hello', helloPayload())
+
+  // A client that mounts on an already-open socket (e.g. navigating back to the
+  // hub) can re-request the current state instead of waiting for a reconnect.
+  socket.on('sync', () => socket.emit('hello', helloPayload()))
 
   // Phone signals it has signed in → unlocks the laptop's "Proceed" gate.
   socket.on('signed-in', () => {

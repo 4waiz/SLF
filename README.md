@@ -37,15 +37,21 @@ manually from the Vision Verification block at any time.
 
 ---
 
-## Two-round scanning
+## Two-round verification
 
-After sign-in and **Assemble Drone**, the station shows a **Rounds** hub:
+The **Rounds hub** offers two **independent** passes over the 26 parts of the
+Drone Production Form — pick either:
 
-- **Round 1 — Mobile Barcode Scan:** use your phone as a barcode reader. Parts
-  **Part 1 / Part 2 / Part 3** tick off on the laptop in real time as the phone
-  scans them.
-- **Round 2 — Laptop Scan:** the existing on-screen, camera/OCR work-instruction
-  flow (unchanged) — opens from the hub.
+- **Round 1 — Mobile Barcode Scan:** your phone is the scanner. The laptop shows
+  the part it expects; you scan that part's barcode; it turns green and the
+  station advances to the next — **in order**. Scanning the wrong part or an
+  unknown barcode is rejected on the phone. (Gated: enabled once a phone signs
+  in.)
+- **Round 2 — Laptop Scan:** the **existing** on-screen camera/OCR flow
+  (unchanged) — no phone needed.
+
+Each round you open from the hub is a **fresh pass**; finishing one returns you
+to the hub to choose the other.
 
 ### Run it
 
@@ -56,35 +62,42 @@ npm run dev:all      # laptop app (:5173) + mobile scan server (:3001) together
 
 Or run them separately in two terminals: `npm run dev` and `npm run mobile`.
 Open the laptop app at `http://localhost:5173`, sign in (**Operator / 123**),
-choose a colour, and you land on the **Rounds** hub.
+choose a colour → you land on the **Rounds** connect-gate.
 
 > **One-time cert trust (laptop):** the mobile server uses a self-signed HTTPS
-> cert so phone cameras work. If Round 1 shows *"Waiting for server…"*, open
-> **https://localhost:3001** once in the laptop browser, accept the warning, then
-> reload the app.
+> cert so phone cameras work. If the gate shows *"Waiting for the scan server…"*,
+> open **https://localhost:3001** once in the laptop browser, accept the warning,
+> then reload the app.
 
-### Open the mobile scanner
+### Choose a round
 
-The mobile URL is **`https://<laptop-ip>:3001`** — it's printed in the console
-on startup and shown (with a QR code) in the Round 1 card. On your phone (same
-Wi-Fi):
+The hub shows two cards. **Round 2** starts immediately (laptop only). **Round
+1** needs a phone — the card shows a QR + URL (**`https://<laptop-ip>:3001`**,
+also printed in the console). On your phone (same Wi-Fi):
 
 1. Scan the QR code, or type the URL.
 2. Accept the one-time security warning (**Advanced → proceed**) — needed for the
    camera on a LAN IP.
-3. Sign in (**Operator / 123**) → **Start Scanning** → allow camera access.
+3. Sign in (**Operator / 123**). The card's **Start Round 1** button unlocks the
+   moment the phone signs in.
+4. Press **Start Round 1** on the laptop. On the phone tap **Start Scanning** and
+   allow camera access.
 
-### Test barcodes
+### Barcodes (one per part)
 
-Printable Code-128 PNGs live in **`generated_barcodes/`**:
-`part_1_barcode.png`, `part_2_barcode.png`, `part_3_barcode.png` (encoding
-`PART_1` / `PART_2` / `PART_3`). Print them, or just display them on a second
-screen, and scan with the phone. Regenerate any time with `npm run barcodes`.
+Printable Code-128 PNGs live in **`generated_barcodes/`** — one per part, named
+`NN_<pn>_<slug>.png` (e.g. `01_1001_main-frame-center-plate.png`). Each encodes
+the **part number** (`1001`…), the same value the laptop OCR matches, so the same
+sheet works for both rounds. Print them or show them on a second screen.
 
-Point the phone at a barcode → the phone shows **"Scanned: Part 1"** and the
-laptop's Round 1 card ticks **Part 1**. Unknown barcodes show **"Unknown
-barcode"** and are ignored. The accepted mapping is one file —
-[`shared/parts.json`](shared/parts.json).
+Regenerate any time with `npm run barcodes` — it reads the parts from
+[`src/data/steps.ts`](src/data/steps.ts) and rewrites both the PNGs and the
+pn→name mapping in [`shared/parts.json`](shared/parts.json) (the value the server
+matches against). Re-run it whenever you edit the steps.
+
+On the phone you'll see **"Now scan: \<part\>"**, then **"\<part\> Scanned"** on a
+match, **"Wrong part — scan \<expected\>"** out of order, or **"Incorrect
+barcode"** for anything unknown.
 
 ---
 
@@ -140,14 +153,15 @@ src/
   lib/
     ocr.ts                  tesseract.js wrapper (dynamic import, digit OCR)
     records.ts              RecordsService interface + IndexedDB implementation
+    mobileLink.ts           shared Socket.IO link + hooks (gate + station scan)
   hooks/
     useCamera.ts            getUserMedia + frame capture
-    useRound1.ts            Round 1 Socket.IO live link to the mobile server
   components/
     BridgeLogo.tsx          animated SVG bridge
     IntroScreen.tsx
-    RoundsHub.tsx           Round 1 (live mobile scan) + Round 2 launch
-    AssemblyStation.tsx     Round 2 — owns build state, lays out the 3 regions
+    RoundsHub.tsx           connect gate — link the phone, then Proceed
+    RoundIntermission.tsx   Round 1 → Round 2 hand-off overlay
+    AssemblyStation.tsx     Round 1 (mobile scan) → Round 2 (laptop OCR)
     StepRail.tsx
     InstructionPanel.tsx    image → part row → instruction → verification → VIDEO
     PartFigure.tsx          inline SVG per PartKind (no external assets)

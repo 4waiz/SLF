@@ -2944,20 +2944,49 @@ video {
   margin-top: 6px;
 }
 
-.gate {
+/* Two selectable round cards */
+.rounds-two {
   flex: 1;
   display: grid;
-  place-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  max-width: 980px;
+  width: 100%;
+  margin: 0 auto;
+  align-items: stretch;
 }
-.gate-card {
+.round-card {
   position: relative;
-  width: min(540px, 94vw);
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 26px;
+  padding: 24px;
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(8px);
+}
+/* Push each card's action button to the bottom so the two cards align. */
+.round-card .round-open-btn {
+  margin-top: auto;
+}
+.round-r2-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px;
+  margin-bottom: 16px;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius);
+  background: var(--inset);
+}
+.round-r2-emoji {
+  font-size: 42px;
+}
+.round-r2-cap {
+  font-size: 13px;
+  color: var(--text-dim);
 }
 .round-kicker {
   display: block;
@@ -3102,47 +3131,21 @@ video {
   background: var(--panel-2);
   border: 1px solid var(--border);
 }
-
-/* Two-round explainer */
-.gate-rounds {
-  list-style: none;
-  margin: 18px 0 0;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--border);
-  display: grid;
-  gap: 12px;
-}
-.gate-rounds li {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  font-size: 13.5px;
-  color: var(--text-dim);
-  line-height: 1.5;
-}
-.gate-rounds li b {
-  color: var(--text);
-}
-.gate-round-no {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 13px;
+/* Round 2 button — outlined teal so it reads as the alternate choice. */
+.round-open-btn.is-alt {
   color: var(--teal);
   background: var(--teal-ghost);
-  border: 1px solid var(--teal-ghost);
+  border: 1px solid var(--teal);
+}
+.round-open-btn.is-alt:hover {
+  background: rgba(34, 211, 197, 0.2);
 }
 
 .rounds-bottom {
   display: flex;
   align-items: center;
   gap: 14px;
-  max-width: 540px;
+  max-width: 980px;
   width: 100%;
   margin: 18px auto 0;
 }
@@ -3159,4 +3162,10 @@ video {
 .rounds-back:hover {
   border-color: var(--border-2);
   color: var(--text);
+}
+
+@media (max-width: 820px) {
+  .rounds-two {
+    grid-template-columns: 1fr;
+  }
 }

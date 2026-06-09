@@ -3,20 +3,18 @@ import { useMobileLink, MOBILE_PORT } from '../lib/mobileLink'
 import { steps } from '../data/steps'
 
 interface RoundsHubProps {
-  /** Enter the station (Round 1) once the phone is linked. */
-  onProceed: () => void
+  /** Open the station in the chosen round (1 = mobile scan, 2 = laptop scan). */
+  onStartRound: (round: 1 | 2) => void
   /** Back to the home / product screen. */
   onBack: () => void
 }
 
 /**
- * Connect gate shown after sign-in. Round 1 turns the phone into the barcode
- * scanner, so the operator must connect + sign in on the phone here first —
- * "Proceed" stays disabled until a phone has signed in. After that:
- *   Round 1 — scan each of the 26 parts with the phone.
- *   Round 2 — re-verify each part with the laptop camera (the existing flow).
+ * Rounds hub — pick either round (they're independent passes over the 26 parts):
+ *   Round 1 — Mobile Barcode Scan (needs a phone signed in; gated until then).
+ *   Round 2 — Laptop Scan (the existing camera/OCR flow; no phone needed).
  */
-export function RoundsHub({ onProceed, onBack }: RoundsHubProps) {
+export function RoundsHub({ onStartRound, onBack }: RoundsHubProps) {
   const { connected, signedIn, urls, serverUrl } = useMobileLink()
   const [qrFailed, setQrFailed] = useState(false)
 
@@ -27,7 +25,7 @@ export function RoundsHub({ onProceed, onBack }: RoundsHubProps) {
       ? 'Waiting for the scan server…'
       : status === 'waiting'
         ? 'Waiting for phone sign-in…'
-        : 'Phone signed in — ready to start'
+        : 'Phone signed in — ready'
 
   return (
     <div className="rounds">
@@ -38,16 +36,17 @@ export function RoundsHub({ onProceed, onBack }: RoundsHubProps) {
         <p className="subtitle">SLF · Two-Round Verification</p>
       </header>
 
-      <main className="gate">
-        <section className="gate-card">
-          <span className="round-kicker">Step 1 · Connect</span>
-          <h2 className="round-title">Connect your phone</h2>
+      <main className="rounds-two">
+        {/* ============================ ROUND 1 ============================ */}
+        <section className="round-card">
+          <span className="round-kicker">Round 1</span>
+          <h2 className="round-title">Mobile Barcode Scan</h2>
           <p className="round-desc">
-            Round 1 uses your phone as the barcode scanner. Open the link, sign in on the phone, then
-            press Proceed.
+            Use your phone as the scanner. The laptop shows each of the {steps.length} parts in turn;
+            scan that part's barcode and it ticks off here.
           </p>
 
-          {/* QR + URL to open the scanner on the phone */}
+          {/* Connect the phone */}
           <div className="round-join">
             <div className="round-qr">
               {!qrFailed ? (
@@ -64,36 +63,43 @@ export function RoundsHub({ onProceed, onBack }: RoundsHubProps) {
               <span className="round-join-label">Open on your phone</span>
               <code className="round-url">{phoneUrl ?? `https://<laptop-ip>:${MOBILE_PORT}`}</code>
               <span className="round-join-hint">
-                Same Wi-Fi · accept the one-time security warning · sign in (Operator / 123).
+                Same Wi-Fi · accept the warning · sign in (Operator / 123).
               </span>
             </div>
           </div>
 
-          {/* Link status — gates the Proceed button */}
           <div className={`gate-status is-${status}`} role="status">
             <span className="gate-status-dot" />
             {statusText}
           </div>
 
-          <button type="button" className="round-open-btn" disabled={!signedIn} onClick={onProceed}>
-            {signedIn ? 'Proceed to Round 1 →' : 'Sign in on the phone to continue'}
+          <button
+            type="button"
+            className="round-open-btn"
+            disabled={!signedIn}
+            onClick={() => onStartRound(1)}
+          >
+            {signedIn ? 'Start Round 1 →' : 'Sign in on the phone to start'}
           </button>
+        </section>
 
-          {/* What the two rounds are */}
-          <ol className="gate-rounds">
-            <li>
-              <span className="gate-round-no">1</span>
-              <span>
-                <b>Mobile Barcode Scan</b> — scan each of the {steps.length} parts with your phone.
-              </span>
-            </li>
-            <li>
-              <span className="gate-round-no">2</span>
-              <span>
-                <b>Laptop Scan</b> — re-verify each part with the laptop camera (existing flow).
-              </span>
-            </li>
-          </ol>
+        {/* ============================ ROUND 2 ============================ */}
+        <section className="round-card">
+          <span className="round-kicker">Round 2</span>
+          <h2 className="round-title">Laptop Scan</h2>
+          <p className="round-desc">
+            Verify each of the {steps.length} parts with the laptop camera (OCR) or a manual tick —
+            the original on-screen flow. No phone needed.
+          </p>
+
+          <div className="round-r2-art" aria-hidden="true">
+            <span className="round-r2-emoji">🖥️</span>
+            <span className="round-r2-cap">Vision-verified assembly · {steps.length} steps</span>
+          </div>
+
+          <button type="button" className="round-open-btn is-alt" onClick={() => onStartRound(2)}>
+            Start Round 2 →
+          </button>
         </section>
       </main>
 

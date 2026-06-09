@@ -11,6 +11,8 @@ type View = 'login' | 'home' | 'rounds' | 'station'
 export default function App() {
   const [view, setView] = useState<View>('login')
   const [color, setColor] = useState<DroneColorId>('blue')
+  // Which round the station opens in — chosen on the Rounds hub.
+  const [stationRound, setStationRound] = useState<1 | 2>(1)
 
   return (
     <div className="app">
@@ -27,9 +29,17 @@ export default function App() {
         />
       )}
       {view === 'rounds' && (
-        <RoundsHub onProceed={() => setView('station')} onBack={() => setView('home')} />
+        <RoundsHub
+          onStartRound={(r) => {
+            setStationRound(r)
+            setView('station')
+          }}
+          onBack={() => setView('home')}
+        />
       )}
-      {view === 'station' && <AssemblyStation initialColor={color} onExit={() => setView('rounds')} />}
+      {view === 'station' && (
+        <AssemblyStation initialColor={color} initialRound={stationRound} onExit={() => setView('rounds')} />
+      )}
     </div>
   )
 }

@@ -57,7 +57,10 @@ export function useMobileLink() {
     const s = getSocket()
     setConnected(s.connected)
 
-    const onConnect = () => setConnected(true)
+    const onConnect = () => {
+      setConnected(true)
+      s.emit('sync') // refresh state on (re)connect
+    }
     const onDisconnect = () => setConnected(false)
     const onHello = (p: { urls?: string[]; mobileSignedIn?: boolean }) => {
       if (Array.isArray(p?.urls)) setUrls(p.urls)
@@ -69,6 +72,8 @@ export function useMobileLink() {
     s.on('disconnect', onDisconnect)
     s.on('hello', onHello)
     s.on('mobile-status', onStatus)
+    // Mounted on an already-open socket (e.g. returning to the hub) → re-sync.
+    if (s.connected) s.emit('sync')
     return () => {
       s.off('connect', onConnect)
       s.off('disconnect', onDisconnect)

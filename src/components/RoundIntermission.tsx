@@ -1,14 +1,15 @@
 interface RoundIntermissionProps {
   partCount: number
-  onStartRound2: () => void
+  onBackToRounds: () => void
   onReview: () => void
 }
 
 /**
- * Shown when all parts pass Round 1 (mobile barcode scan). Confirms the round
- * and hands off to Round 2 (laptop camera / OCR re-verification).
+ * Shown when all parts pass Round 1 (mobile barcode scan). The two rounds are
+ * independent, so this hands control back to the Rounds hub where Round 2
+ * (laptop camera / OCR) can be started.
  */
-export function RoundIntermission({ partCount, onStartRound2, onReview }: RoundIntermissionProps) {
+export function RoundIntermission({ partCount, onBackToRounds, onReview }: RoundIntermissionProps) {
   return (
     <div className="completion-overlay" role="dialog" aria-modal="true" aria-label="Round 1 complete">
       <div className="completion-card">
@@ -26,15 +27,15 @@ export function RoundIntermission({ partCount, onStartRound2, onReview }: RoundI
         <p className="completion-summary mono">{partCount}/{partCount} parts scanned by phone</p>
 
         <p className="intermission-note">
-          Next: <b>Round 2 — Laptop Scan</b>. Re-verify each part with the laptop camera (OCR) or a
-          manual tick.
+          Both rounds are independent. Head back to the hub to start <b>Round 2 — Laptop Scan</b>
+          whenever you're ready.
         </p>
 
-        <button type="button" className="completion-btn" onClick={onStartRound2}>
-          Start Round 2 — Laptop Scan →
+        <button type="button" className="completion-btn" onClick={onBackToRounds}>
+          Back to Rounds →
         </button>
         <button type="button" className="intermission-review" onClick={onReview}>
-          Back to review Round 1
+          Stay and review Round 1
         </button>
       </div>
     </div>
